@@ -660,7 +660,7 @@ function handleEnter(){
   const n=$('nameField').value.trim();
   if(!n){shake($('nameField'));return;}
   if(transitioning)return;transitioning=true;
-  save(n);logVisitorToSheet(n);
+  save(n);logVisitorToSheet(n);tryStartAudio();
   const btn=$('boardBtn');btn.style.opacity='.5';btn.style.pointerEvents='none';
   btn.innerHTML='<div class="shimmer"></div>Opening the gate&hellip;';
   setTimeout(()=>{const f=$('boardingForm');f.style.transition='all .6s ease';f.style.opacity='0';f.style.transform='translateY(-10px)';},400);
@@ -916,37 +916,87 @@ function shake(el){
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='nameField')handleEnter();});
 
 /* ══ AUDIO (optional assets/music.mp3) ══ */
-let audioMuted=false,_loveStarted=false,_bgAudio=null,_audioAvailable=true;
-(function(){
-  const a=$('_bgAudioEl');
-  if(a)a.addEventListener('error',()=>{_audioAvailable=false;const c=$('audioCtrl');if(c)c.style.display='none';},true);
-})();
-function startScore(){
-  if(_loveStarted)return;_loveStarted=true;
-  try{_bgAudio=$('_bgAudioEl');_bgAudio.loop=true;_bgAudio.volume=.26;
-    _bgAudio.play().catch(()=>{});}catch(e){}
+/* Mobile browsers reject play() until a real user gesture, and the first
+   attempt can fail while the file is still buffering. So: never latch a
+   failure — stay armed and retry on every interaction until it plays. */
+let audioMuted=false,_bgAudio=null,_userVol=.26,_audioStarted=false;
+function getAudio(){if(!_bgAudio)_bgAudio=$('_bgAudioEl');return _bgAudio;}
+
+function tryStartAudio(){
+  const a=getAudio();
+  if(!a||audioMuted)return;
+  if(!a.paused&&!a.ended&&a.currentTime>0)return;   /* already playing */
+  a.loop=true;a.volume=_userVol;
+  try{
+    const p=a.play();
+    if(p&&p.catch)p.catch(()=>{});   /* blocked or not buffered — the next gesture retries */
+  }catch(e){}
 }
-function toggleMute(){audioMuted=!audioMuted;if(_bgAudio)_bgAudio.volume=audioMuted?0:.26;updateMuteBtn();}
-function updateMuteBtn(){const b=$('audioCtrlBtn');if(b)b.textContent=audioMuted?'🔇':'♫';}
+/* Persistent (not once) so a blocked first attempt is not fatal */
+['pointerdown','touchend','click','keydown'].forEach(ev=>{
+  document.addEventListener(ev,tryStartAudio,{passive:true});
+});
+
+function toggleMute(){
+  const a=getAudio();
+  /* If it never started, the button is a play button */
+  if(a&&a.paused&&!audioMuted){tryStartAudio();updateMuteBtn();return;}
+  audioMuted=!audioMuted;
+  if(a){
+    a.volume=audioMuted?0:_userVol;
+    if(!audioMuted&&a.paused)tryStartAudio();
+  }
+  updateMuteBtn();
+}
+function updateMuteBtn(){
+  const b=$('audioCtrlBtn');if(!b)return;
+  const a=getAudio();
+  b.textContent=audioMuted?'🔇':(a&&!a.paused?'♫':'▶');
+}
+function setVolume(v){
+  _userVol=v;audioMuted=(v===0);
+  const a=getAudio();
+  if(a){a.volume=v;if(!audioMuted&&a.paused)tryStartAudio();}
+  updateMuteBtn();
+  const sl=$('audioVol');
+  if(sl){const p=Math.round(v*100);sl.style.background='linear-gradient(to right,rgba(201,162,75,.6) 0%,rgba(201,162,75,.6) '+p+'%,rgba(201,162,75,.15) '+p+'%)';}
+}
+
 (function injectAudioCtrl(){
   const style=document.createElement('style');
   style.textContent=`
     #audioCtrl{position:fixed;bottom:26px;right:16px;z-index:9998;display:flex;flex-direction:column;align-items:center;gap:5px;}
-    #audioCtrlBtn{width:42px;height:42px;border-radius:50%;border:1px solid rgba(201,162,75,.45);background:rgba(4,18,13,.8);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-size:16px;color:#c9a24b;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .3s,box-shadow .3s;box-shadow:0 0 14px rgba(201,162,75,.1);}
+    #audioCtrlBtn{width:44px;height:44px;border-radius:50%;border:1px solid rgba(201,162,75,.45);background:rgba(4,18,13,.8);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-size:16px;color:#c9a24b;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .3s,box-shadow .3s;box-shadow:0 0 14px rgba(201,162,75,.1);}
     #audioCtrlBtn:active{border-color:rgba(201,162,75,.9);box-shadow:0 0 28px rgba(201,162,75,.3);}
-    #audioVol{-webkit-appearance:none;appearance:none;width:42px;height:3px;background:linear-gradient(to right,rgba(201,162,75,.6) 0%,rgba(201,162,75,.6) 26%,rgba(201,162,75,.15) 26%);border-radius:2px;outline:none;cursor:pointer;}
-    #audioVol::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#c9a24b;border:1px solid rgba(201,162,75,.7);box-shadow:0 0 5px rgba(201,162,75,.5);}
+    #audioVol{-webkit-appearance:none;appearance:none;width:44px;height:3px;background:linear-gradient(to right,rgba(201,162,75,.6) 0%,rgba(201,162,75,.6) 26%,rgba(201,162,75,.15) 26%);border-radius:2px;outline:none;cursor:pointer;}
+    #audioVol::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#c9a24b;border:1px solid rgba(201,162,75,.7);box-shadow:0 0 5px rgba(201,162,75,.5);}
+    #audioVol::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#c9a24b;border:1px solid rgba(201,162,75,.7);}
   `;
   document.head.appendChild(style);
   const ctrl=document.createElement('div');ctrl.id='audioCtrl';
-  ctrl.innerHTML=`<div id="audioCtrlBtn" onclick="toggleMute()" title="Toggle music">♫</div>
+  ctrl.innerHTML=`<div id="audioCtrlBtn" onclick="toggleMute()" title="Music on / off">▶</div>
     <input type="range" id="audioVol" min="0" max="1" step="0.05" value="0.26"
-      oninput="const v=parseFloat(this.value);if(_bgAudio)_bgAudio.volume=v;audioMuted=v===0;updateMuteBtn();const p=Math.round(v*100);this.style.background='linear-gradient(to right,rgba(201,162,75,.6) 0%,rgba(201,162,75,.6) '+p+'%,rgba(201,162,75,.15) '+p+'%)';">`;
+      oninput="setVolume(parseFloat(this.value))">`;
   document.body.appendChild(ctrl);
+
+  const a=getAudio();
+  if(a){
+    a.addEventListener('playing',()=>{_audioStarted=true;updateMuteBtn();});
+    a.addEventListener('pause',updateMuteBtn);
+    /* Only give up if the browser truly has no usable source, and retry once first */
+    a.addEventListener('error',()=>{
+      if(a.dataset.retried){
+        if(a.networkState===HTMLMediaElement.NETWORK_NO_SOURCE){
+          const c=$('audioCtrl');if(c)c.style.display='none';
+        }
+        return;
+      }
+      a.dataset.retried='1';
+      setTimeout(()=>{try{a.load();}catch(e){}},1200);
+    });
+    updateMuteBtn();
+  }
 })();
-['click','touchstart','keydown'].forEach(ev=>{
-  document.addEventListener(ev,()=>{if(_audioAvailable)startScore();},{once:true,passive:true});
-});
 
 /* ── TO THE INVITATION ──────────────── */
 function showFinalScreens(){
