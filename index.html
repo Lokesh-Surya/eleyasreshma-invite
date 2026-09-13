@@ -322,7 +322,7 @@ body{-webkit-tap-highlight-color:transparent;}
     <div class="os-tag">And among His signs&hellip; &middot; Ar-Rum 30:21</div>
     <div class="os-names">Eleyas &amp; <em>Reshma</em></div>
     <div class="os-sub">Nikah Ceremony</div>
-    <div class="os-continue">&#10022; &nbsp; Tap anywhere to begin &nbsp; &#10022;</div>
+    <div class="os-continue">&#10022; &nbsp; Tap to continue &nbsp; &#10022;</div>
   </div>
 </div>
 
@@ -631,6 +631,7 @@ function showOpening(){
   os.style.pointerEvents='all';
   os.addEventListener('click',go,{once:true});
   os.addEventListener('touchend',go,{once:true,passive:true});
+  setTimeout(go,5200);   /* don't make the guest tap */
 }
 function initOsP(){
   const cv=$('osParticles');cv.width=innerWidth;cv.height=innerHeight;
@@ -713,6 +714,11 @@ const TAB_LABELS=[['In His','Name'],['A Du\'ā','Answered'],['One','Qibla'],['Th
 const NUMS=['I','II','III','IV','V','VI','VII'];
 
 let jRun=false,vel=0,traveling=false,curChap=-1,btnLocked=false;
+/* The walk plays by itself; any manual tap hands control back to the guest */
+let autoMode=true,autoTimer=null;
+const CHAPTER_DWELL=4200;          /* how long each chapter is held on screen */
+function clearAuto(){if(autoTimer){clearTimeout(autoTimer);autoTimer=null;}}
+function stopAuto(){autoMode=false;clearAuto();updateStrip(curChap);}
 
 const uC=$('corridorCanvas'),uX=uC.getContext('2d');
 let uArch=[],uStars=[],uLan=[],uMotes=[],uMoon={x:.86,y:.115};
@@ -824,6 +830,13 @@ function updateStrip(idx){
   const cc=$('chapCount');if(cc)cc.textContent=Math.max(idx+1,0)+' / '+CHAPTERS.length;
   const lbl=$('nextBtnLabel'),btn=$('nextBtn');
   if(!lbl||!btn)return;
+  if(autoMode){
+    lbl.textContent='Skip to the invitation';
+    btn.classList.remove('done');
+    btn.style.borderColor='';btn.style.boxShadow='';
+    btn.onclick=()=>{stopAuto();showFinalScreens();};
+    return;
+  }
   if(idx>=CHAPTERS.length-1){
     lbl.textContent='The Invitation ✦';
     btn.classList.remove('done');
@@ -845,6 +858,14 @@ function showHolo(idx){
     $('chapText').innerHTML=CHAPTERS[idx].txt;
     $('chapLine').textContent=CHAPTERS[idx].line;
     hl.classList.add('show');updateStrip(idx);
+    clearAuto();
+    if(autoMode){
+      autoTimer=setTimeout(()=>{
+        if(!autoMode)return;
+        if(idx>=CHAPTERS.length-1)showFinalScreens();
+        else walkTo(idx+1);
+      },idx>=CHAPTERS.length-1?CHAPTER_DWELL+900:CHAPTER_DWELL);
+    }
   },200);
 }
 function walkTo(idx,onDone){
@@ -871,8 +892,8 @@ function walkTo(idx,onDone){
   }
   requestAnimationFrame(tick);
 }
-function nextChapter(){const nx=curChap+1;if(nx>=CHAPTERS.length)return;walkTo(nx);}
-function jumpToChapter(i){if(btnLocked||!jRun||i===curChap)return;walkTo(i);}
+function nextChapter(){stopAuto();const nx=curChap+1;if(nx>=CHAPTERS.length)return;walkTo(nx);}
+function jumpToChapter(i){if(btnLocked||!jRun||i===curChap)return;stopAuto();walkTo(i);}
 
 function jLoop(){
   requestAnimationFrame(jLoop);
@@ -887,6 +908,8 @@ function startJourney(){
   window.addEventListener('resize',()=>{initJ();});
   setTimeout(()=>{$('journeyHud').classList.add('show');},800);
   jRun=true;requestAnimationFrame(jLoop);
+  autoMode=true;clearAuto();
+  autoTimer=setTimeout(()=>{if(autoMode)walkTo(0);},1400);
 }
 
 /* ── ONBOARDING PARALLAX & HELPERS ──── */
@@ -1080,7 +1103,7 @@ function showFinalScreens(){
       <div class="cd-grid" id="fpCdGrid" style="opacity:0;transition:opacity 1s ease .3s;"></div>
     </div>
   </div>
-  <div id="fpImpactHint" style="position:absolute;bottom:9%;left:50%;transform:translateX(-50%);z-index:4;font-family:'Jost',sans-serif;font-size:7.5px;letter-spacing:.22em;color:rgba(201,162,75,.45);text-transform:uppercase;white-space:nowrap;animation:breathe 2.5s ease-in-out infinite;opacity:0;transition:opacity 1s ease;">Tap to light the lantern</div>
+  <div id="fpImpactHint" style="position:absolute;bottom:9%;left:50%;transform:translateX(-50%);z-index:4;font-family:'Jost',sans-serif;font-size:7.5px;letter-spacing:.22em;color:rgba(201,162,75,.45);text-transform:uppercase;white-space:nowrap;animation:breathe 2.5s ease-in-out infinite;opacity:0;transition:opacity 1s ease;">Lighting the lantern&hellip;</div>
 </div>
 
 <div class="fp-sep"></div>
@@ -1254,7 +1277,8 @@ function initFpCountdown(){
   cdLamp={x:cdW/2,y:-60,s:Math.min(cdW,cdH)*.075,lit:false};
   cdRisers=[];
   for(let i=0;i<7;i++)cdRisers.push({x:Math.random()*cdW,y:cdH+Math.random()*cdH*.8,s:Math.random()*5+4,sp:Math.random()*.35+.18,ph:Math.random()*6.28});
-  setTimeout(()=>{const h=$('fpImpactHint');if(h)h.style.opacity='1';},1500);
+  setTimeout(()=>{const h=$('fpImpactHint');if(h)h.style.opacity='1';},1200);
+  setTimeout(()=>{if(cdPhase==='approach')triggerIgnite();},2600);   /* lights itself */
   const section=$('fpCountdown');
   section.addEventListener('click',triggerIgnite);
   section.addEventListener('touchend',triggerIgnite,{passive:true});
