@@ -296,21 +296,6 @@ body{-webkit-tap-highlight-color:transparent;}
   </div>
 </div>
 
-<!-- ══ RETURNING GUEST ══ -->
-<div id="returnScreen">
-  <canvas class="rs-art" id="rsArt"></canvas>
-  <img class="rs-bg" src="assets/couple.jpg" alt="" onload="this.classList.add('ready')" onerror="this.style.display='none'">
-  <div class="rs-overlay"></div>
-  <div class="rs-content">
-    <div class="rs-tag" id="rsTag">أَهْلًا بِكَ مَرَّةً أُخْرَى</div>
-    <div class="rs-welcome" id="rsWelcome">Welcome back,</div>
-    <div class="rs-name" id="rsName"><em id="rsNameText">&mdash;</em></div>
-    <div class="rs-title" id="rsTitle">Your place among us is still kept.</div>
-    <div class="rs-divider" id="rsDivider"><div class="rs-divider-line"></div><div class="rs-divider-gem"></div><div class="rs-divider-line"></div></div>
-    <div class="rs-sub" id="rsSub">Continuing where you left off&hellip;</div>
-  </div>
-</div>
-
 <!-- ══ OPENING SCENE ══ -->
 <div id="openingScene">
   <canvas class="os-art" id="osArt"></canvas>
@@ -373,8 +358,11 @@ window.addEventListener('load',()=>{
   setTimeout(()=>{
     $('loading').classList.add('gone');
     spawnFP();
+    /* Every visit opens on the hero. A remembered name only pre-fills the
+       field, so a returning guest taps straight through. */
     const p=load();
-    if(p&&p.name) showReturn(p.name);
+    const f=$('nameField');
+    if(p&&p.name&&f&&!f.value) f.value=p.name;
   },1700);
 });
 
@@ -608,19 +596,7 @@ function ambientCourtyard(cv){
     requestAnimationFrame(d);
   })();
 }
-ambientCourtyard($('rsArt'));
 ambientCourtyard($('osArt'));
-
-/* ── RETURN SCREEN ──────────────────── */
-function showReturn(name){
-  $('scroll-wrap').style.display='none';
-  $('openingScene').style.display='none';
-  const rs=$('returnScreen');rs.style.transition='opacity 1.2s ease';rs.classList.add('visible');
-  $('rsNameText').textContent=name;
-  [{el:$('rsTag'),d:.4},{el:$('rsWelcome'),d:.8},{el:$('rsName'),d:1.1},{el:$('rsTitle'),d:1.4},{el:$('rsDivider'),d:1.7},{el:$('rsSub'),d:2.0}]
-    .forEach(({el,d})=>{el.style.animation=`staggerUp .8s ease ${d}s forwards`;});
-  setTimeout(()=>{rs.style.transition='opacity 1s ease';rs.style.opacity='0';setTimeout(()=>{rs.classList.remove('visible');rs.style.display='none';startJourney();},1000);},3200);
-}
 
 /* ── OPENING SCENE ──────────────────── */
 function showOpening(){
